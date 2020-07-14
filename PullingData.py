@@ -90,7 +90,7 @@ for match in match_ids:
         if radwin == False:
             radiantwin.append(0)
     except:
-        print('Failed to find match id')
+        print('Failed to find match id' + str(matchnum))
         failedmatches.append(match)
         continue
     print('Finished on Pulling data for ' + str(matchnum) + '!')
@@ -111,9 +111,5 @@ df = df.replace(heros)
 
 df['RadWin'] = radiantwin
 
-df2 = pd.DataFrame
-df2['FailedMatches'] = failedmatches
-
 df.to_csv('ProDota2Matchs.csv', index=False)
-df2.to_csv('FailedMatches.csv', index=False)
 df.to_excel('ProDota2Matchs.xlsx', index=False)
