@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import balanced_accuracy_score, accuracy_score, confusion_matrix, f1_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
 import lightgbm as lgb
 from sklearn.externals import joblib
 import pickle
@@ -69,18 +70,14 @@ df_dummies = pd.concat([radiant, dire], axis=1, sort=False)
 df_dummies['RadWin'] = RadWin
 df_dummies.to_csv('dotadummies.csv', index=False)
 
-#df_dummies = pd.read_csv('dotadummies.csv')
-X = df_dummies.iloc[:,0:238].values
+df_dummies = pd.read_csv('dotadummies.csv')
+X = df_dummies.iloc[:,0:238]
 Y = df_dummies['RadWin']
 
-X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
-
-X_train = X_train.astype('float32')
-X_test = X_test.astype('float32')
-y_train = y_train.astype('float32')
-y_test = y_test.astype('float32')
+X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.4, random_state=42)
 
 d_train = lgb.Dataset(X_train, label=y_train)
+lgb_eval = lgb.Dataset(X_test, y_test)
 
 lgbparams = {}
 lgbparams['learning_rate'] = 0.003
@@ -88,10 +85,22 @@ lgbparams['boosting_type'] = 'gbdt'
 lgbparams['objective'] = 'binary'
 lgbparams['metric'] = 'binary_error'
 lgbparams['sub_feature'] = 0.5
-lgbparams['num_leaves'] = 10
-lgbparams['min_data'] = 50
+lgbparams['num_leaves'] = 5
+lgbparams['min_data'] = 100
+lgbparams['max_bin']= 3
 lgbparams['max_depth'] = 10
-clf = lgb.train(lgbparams, d_train, 2000)
+clf = lgb.train(lgbparams, d_train, valid_sets=lgb_eval, early_stopping_rounds=5)
+
+cv_results = lgb.cv(lgbparams,
+        d_train,
+        num_boost_round=100,
+        nfold=3,
+        metrics='mae',
+        early_stopping_rounds=3,
+        # This is what I added
+        stratified=False
+        )
+
 lgby_pred = clf.predict(X_test)
 for i in range(0,len(lgby_pred)):
     if lgby_pred[i]>=.5:
@@ -100,7 +109,7 @@ for i in range(0,len(lgby_pred)):
        lgby_pred[i]=0
 
 lgb_matrix = confusion_matrix(y_test, lgby_pred)
-lgb_acc = accuracy_score(y_test, lgby_pred)
+lgb_acc = f1_score(y_test, lgby_pred, average='binary')
 print('Light GBM Accuracy')
 print(lgb_acc*100)
 
@@ -113,13 +122,13 @@ fig1 = ax1.get_figure()
 fig1.savefig('LightGBM.png')
 
 
-rf_model = RandomForestClassifier()
+rf_model = RandomForestClassifier(n_estimators=10000, max_features=130, max_depth=2, min_samples_leaf=5)
 rf_model.fit(X_train, y_train)
 random_forest_pred = rf_model.predict(X_test)
 print(random_forest_pred)
 
 rf_matrix = confusion_matrix(y_test, random_forest_pred)
-rf_acc = accuracy_score(y_test, random_forest_pred)
+rf_acc = balanced_accuracy_score(y_test, random_forest_pred)
 print('Random Forest Accuracy')
 print(rf_acc*100)
 
@@ -132,27 +141,24 @@ ax2.xaxis.set_ticklabels(['RadWin', 'RadLoss']); ax.yaxis.set_ticklabels(['RadWi
 fig2 = ax2.get_figure()
 fig2.savefig('RandomForest.png')
 
+knn_model = KNeighborsClassifier()
+knn_model.fit(X_train, y_train)
+knn_pred = knn_model.predict(X_test)
+print(knn_pred)
 
-opt_rf_model = RandomForestClassifier(n_estimators=200,
-                                      min_samples_split=10,
-                                      min_samples_leaf=5,
-                                      n_jobs=-1,
-                                      random_state=42)
-opt_rf_model.fit(X_train, y_train)
-opt_RF_pred = opt_rf_model.predict_proba(X_test)
-
-rfopt_matrix = confusion_matrix(y_test, random_forest_pred)
-rfopt_acc = accuracy_score(y_test, random_forest_pred)
-print('Optimized Random Forest Accuracy')
-print(rfopt_acc*100)
+knn_matrix = confusion_matrix(y_test, knn_pred)
+knn_acc = balanced_accuracy_score(y_test, knn_pred)
+print('kNN accuracy:')
+print(rf_acc*100)
 
 ax.remove()
 ax= plt.subplot()
-ax2 = sns.heatmap(rfopt_matrix, annot=True, fmt='g', ax = ax);
+ax2 = sns.heatmap(rf_matrix, annot=True, fmt='g', ax = ax);
 ax2.set_xlabel('Predicted labels');ax.set_ylabel('True labels');
-ax2.set_title('Confusion Matrix for Optimized Random Forest Classifier');
+ax2.set_title('Confusion Matrix for Random Forest Classifier');
 ax2.xaxis.set_ticklabels(['RadWin', 'RadLoss']); ax.yaxis.set_ticklabels(['RadWin', 'RadLoss']);
 fig2 = ax2.get_figure()
-fig2.savefig('OptimizedRandomForest.png')
+fig2.savefig('RandomForest.png')
 
-joblib.dump(clf, 'lgb.pkl')
+
+joblib.dump(rf_model, 'RandomForestDota.pkl')
