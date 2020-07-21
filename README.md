@@ -27,7 +27,6 @@ After scraping the data I needed to clean it up for use in the model. Made the f
 Created a LightGBM model and a Random Forest Model to predict which side would win the game.
 
 ## Model Performance:  
-The Random Forest Model proved to be the most effective and outperformed the Light GBM model but not significantly. Therefore chose to package the Light GBM model for production due to better computing speed.  
-* Random Forest: 96.5% Accuracy
-* Light GBM = 96.4% Accuracy
-<img src="/LightGBM.png" width=426 height=320> 
+The Random Forest Model proved to be the most effective and outperformed the Light GBM model but not significantly. Therefore chose to package the Random Forest Model.  
+* Random Forest: 70% Accuracy
+* Light GBM = 67% Accuracy
